@@ -4,6 +4,7 @@
 # 3. python ./vps.py
 
 from api import Detector
+from utils.MWtools import MWeval
 from PIL import Image
 import selectors
 import socket
@@ -22,21 +23,28 @@ import threading
 def get_tmp_filename(camera_name):
 	return "." + camera_name + ".tmp.png"
 
-def camera_thread(cam_ip):
-	print("(", cam_ip, ")[---] Connecting")
+def camera_thread(data, stop):
+	print("(", data.cam_ip, ")[---] Connecting")
 	capture = cv2.VideoCapture("http://" + cam_ip + ":81/stream", cv2.CAP_FFMPEG)
 	while(1):
-		print("(", cam_ip, ")[1/3] Capturing frame...")
+		print("(", data.cam_ip, ")[1/3] Capturing frame...")
 		success, frame = capture.read()
 
 		if success == False:
-			print("(", cam_ip, ")[---] Frame capture unsuccessful!")
-			break;
+			print("(", data.cam_ip, ")[---] Frame capture unsuccessful!")
+			break
 
 		cv2.imwrite(get_tmp_filename(cam_ip), frame)
-		print("(", cam_ip, ")[2/3] Saved. Processing...")
-		dts = detector.detect_one(img_path=(get_tmp_filename(cam_ip)), input_size=320, conf_thres=0.3, visualize=False, return_img=False)
-		print("(", cam_ip, ")[3/3] Done:", dts)
+		print("(", data.cam_ip, ")[2/3] Saved. Processing...")
+		dts = detector.detect_one(img_path="./images/exhibition.jpg", input_size=1024, conf_thres=0.3, visualize=False, return_img=False)
+		
+		people_amount = len(dts)
+		print("(", data.cam_ip, ")[3/3] Done:", people_amount)
+		data.outb += b'\x04'
+		data.outb += bytes([people_amount])
+
+		if stop == True:
+			break
 
 def read_net_command_connect(socket, data):
 	length = socket.recv(1)
@@ -44,13 +52,20 @@ def read_net_command_connect(socket, data):
 	print("Read camera ip:", cam_ip)
 	data.cam_ip = cam_ip
 	
-	data.thread = threading.Thread(target=camera_thread, args=([cam_ip]))
+	data.threadstop = False
+	data.thread = threading.Thread(target=camera_thread, args=([data, lambda: data.threadstop]))
 	data.thread.start()
 	print("Camera thread started for:", cam_ip)
 
+def read_net_command_stop(socket, data):
+	print("Stopping camera:", data.cam_ip, " (kan ff dure als ie nog bezig is met processe)")
+	data.threadstop = True
+	data.outb += b'\x03' # verstuur close confirmation signal
+
 def read_net_command(command, socket, data):
 	commands = {
-		b'\x01' : read_net_command_connect
+		b'\x01' : read_net_command_connect,
+		b'\x02' : read_net_command_stop
 	}
 
 	commands[command](socket, data)
