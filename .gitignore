@@ -144,3 +144,6 @@ dmypy.json
 
 # example.py output
 output.jpg
+
+# vps.py temp images
+.*.tmp.*
