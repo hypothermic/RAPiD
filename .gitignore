@@ -147,3 +147,4 @@ output.jpg
 
 # vps.py temp images
 .*.tmp.*
+.*.debug.*

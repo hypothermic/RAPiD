@@ -5,6 +5,7 @@
 
 from api import Detector
 from utils.MWtools import MWeval
+from utils import visualization
 from PIL import Image
 import selectors
 import socket
@@ -24,27 +25,33 @@ def get_tmp_filename(camera_name):
 	return "." + camera_name + ".tmp.png"
 
 def camera_thread(data, stop):
-	print("(", data.cam_ip, ")[---] Connecting")
-	capture = cv2.VideoCapture("http://" + cam_ip + ":81/stream", cv2.CAP_FFMPEG)
-	while(1):
+	print("(", data.cam_ip, ")[---] Starting camera thread")
+	while(stop()):
+		# We moeten elke keer opnieuw verbinden met de camera omdat anders
+		# de videostream wordt gesloten omdat er te weinig activiteit plaatsvindt
 		print("(", data.cam_ip, ")[1/3] Capturing frame...")
+		capture = cv2.VideoCapture("http://" + data.cam_ip + ":81/stream", cv2.CAP_FFMPEG)
 		success, frame = capture.read()
+		capture.release()
 
 		if success == False:
 			print("(", data.cam_ip, ")[---] Frame capture unsuccessful!")
 			break
 
-		cv2.imwrite(get_tmp_filename(cam_ip), frame)
+		os.remove(get_tmp_filename(data.cam_ip))
+		cv2.imwrite(get_tmp_filename(data.cam_ip), frame)
 		print("(", data.cam_ip, ")[2/3] Saved. Processing...")
-		dts = detector.detect_one(img_path="./images/exhibition.jpg", input_size=1024, conf_thres=0.3, visualize=False, return_img=False)
+		dts = detector.detect_one(img_path = get_tmp_filename(data.cam_ip), input_size=320, conf_thres=0.3, visualize=False, return_img=False)
 		
+		np_image = numpy.array(Image.open(get_tmp_filename(data.cam_ip)))
+		visualization.draw_dt_on_np(np_image, dts, show_angle=True, show_count=True, text_size=0.35)
+		im = Image.fromarray(np_image)
+		im.save("." + data.cam_ip + ".debug.png")
+
 		people_amount = len(dts)
 		print("(", data.cam_ip, ")[3/3] Done:", people_amount)
-		data.outb += b'\x04'
-		data.outb += bytes([people_amount])
-
-		if stop == True:
-			break
+		data.outgoing += b'\x04'
+		data.outgoing += bytes([people_amount])
 
 def read_net_command_connect(socket, data):
 	length = socket.recv(1)
@@ -52,15 +59,15 @@ def read_net_command_connect(socket, data):
 	print("Read camera ip:", cam_ip)
 	data.cam_ip = cam_ip
 	
-	data.threadstop = False
+	data.threadstop = True
 	data.thread = threading.Thread(target=camera_thread, args=([data, lambda: data.threadstop]))
 	data.thread.start()
 	print("Camera thread started for:", cam_ip)
 
 def read_net_command_stop(socket, data):
 	print("Stopping camera:", data.cam_ip, " (kan ff dure als ie nog bezig is met processe)")
-	data.threadstop = True
-	data.outb += b'\x03' # verstuur close confirmation signal
+	data.threadstop = False
+	data.outgoing += b'\x03' # verstuur close confirmation signal
 
 def read_net_command(command, socket, data):
 	commands = {
