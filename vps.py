@@ -38,7 +38,9 @@ def camera_thread(data, stop):
 			print("(", data.cam_ip, ")[---] Frame capture unsuccessful!")
 			break
 
-		os.remove(get_tmp_filename(data.cam_ip))
+                if os.path.exists(get_tmp_filename(data.cam_ip)):
+                    os.remove(get_tmp_filename(data.cam_ip))
+
 		cv2.imwrite(get_tmp_filename(data.cam_ip), frame)
 		print("(", data.cam_ip, ")[2/3] Saved. Processing...")
 		dts = detector.detect_one(img_path = get_tmp_filename(data.cam_ip), input_size=320, conf_thres=0.3, visualize=False, return_img=False)
@@ -56,7 +58,7 @@ def camera_thread(data, stop):
 def read_net_command_connect(socket, data):
 	length = socket.recv(1)
 	cam_ip = socket.recv(length[0]).decode("utf-8")
-	print("Read camera ip:", cam_ip)
+        print("Read camera ip:", cam_ip)
 	data.cam_ip = cam_ip
 	
 	data.threadstop = True
