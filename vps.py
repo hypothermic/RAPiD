@@ -31,22 +31,24 @@ def camera_thread(data, stop):
 		# de videostream wordt gesloten omdat er te weinig activiteit plaatsvindt
 		print("(", data.cam_ip, ")[1/3] Capturing frame...")
 		capture = cv2.VideoCapture("http://" + data.cam_ip + ":81/stream", cv2.CAP_FFMPEG)
+		
 		success, frame = capture.read()
 		capture.release()
 
 		if success == False:
 			print("(", data.cam_ip, ")[---] Frame capture unsuccessful!")
+			data.outgoing += b'\x03'
 			break
 
-                if os.path.exists(get_tmp_filename(data.cam_ip)):
-                    os.remove(get_tmp_filename(data.cam_ip))
+		if os.path.exists(get_tmp_filename(data.cam_ip)):
+			os.remove(get_tmp_filename(data.cam_ip))
 
 		cv2.imwrite(get_tmp_filename(data.cam_ip), frame)
 		print("(", data.cam_ip, ")[2/3] Saved. Processing...")
-		dts = detector.detect_one(img_path = get_tmp_filename(data.cam_ip), input_size=320, conf_thres=0.3, visualize=False, return_img=False)
+		dts = detector.detect_one(img_path = get_tmp_filename(data.cam_ip), input_size=800, conf_thres=0.3, visualize=False, return_img=False)
 		
 		np_image = numpy.array(Image.open(get_tmp_filename(data.cam_ip)))
-		visualization.draw_dt_on_np(np_image, dts, show_angle=True, show_count=True, text_size=0.35)
+		visualization.draw_dt_on_np(np_image, dts, show_angle=True, show_count=True, text_size=0.30)
 		im = Image.fromarray(np_image)
 		im.save("." + data.cam_ip + ".debug.png")
 
@@ -58,9 +60,9 @@ def camera_thread(data, stop):
 def read_net_command_connect(socket, data):
 	length = socket.recv(1)
 	cam_ip = socket.recv(length[0]).decode("utf-8")
-        print("Read camera ip:", cam_ip)
+	print("Read camera ip:", cam_ip)
 	data.cam_ip = cam_ip
-	
+
 	data.threadstop = True
 	data.thread = threading.Thread(target=camera_thread, args=([data, lambda: data.threadstop]))
 	data.thread.start()
