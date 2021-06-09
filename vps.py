@@ -21,9 +21,11 @@ import threading
 # ------------------------------------------------------------------------------------------ #
 
 
+# Maakt een temp .png file aan om te checken hoe het werkt 
 def get_tmp_filename(camera_name):
 	return "." + camera_name + ".tmp.png"
 
+# Start een connectie met de camera en haalt de beelden van de camera.
 def camera_thread(data, stop):
 	print("(", data.cam_ip, ")[---] Starting camera thread")
 	while(stop()):
@@ -57,6 +59,7 @@ def camera_thread(data, stop):
 		data.outgoing += b'\x04'
 		data.outgoing += bytes([people_amount])
 
+# Connect met een camera aan de hand van de camera's IP
 def read_net_command_connect(socket, data):
 	length = socket.recv(1)
 	cam_ip = socket.recv(length[0]).decode("utf-8")
@@ -68,6 +71,7 @@ def read_net_command_connect(socket, data):
 	data.thread.start()
 	print("Camera thread started for:", cam_ip)
 
+# Stopt de connectie met een camera
 def read_net_command_stop(socket, data):
 	print("Stopping camera:", data.cam_ip, " (kan ff dure als ie nog bezig is met processe)")
 	data.threadstop = False
@@ -81,6 +85,7 @@ def read_net_command(command, socket, data):
 
 	commands[command](socket, data)
 
+# Accepteert de connectie met een client
 def accept_client(socket):
 	connection, address = socket.accept()
 	print("Client geaccepteerd:", address)
@@ -89,6 +94,7 @@ def accept_client(socket):
 	events = selectors.EVENT_READ | selectors.EVENT_WRITE
 	selector.register(connection, events, data=data)
 
+# Leest ontvangen data uit
 def read_client(key, mask):
 	socket = key.fileobj
 	data = key.data
@@ -135,6 +141,7 @@ selector.register(listener, selectors.EVENT_READ, data=None)
 
 print("[3/3] Main loop...")
 
+# Infinite loop om de code te runnen zonder dat deze onderbroken wordt
 while True:
 	events = selector.select(timeout=None)
 	
